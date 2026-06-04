@@ -21,7 +21,10 @@ export default function ScriptCard({ script, isAdmin, onEdit, onDelete, onRefres
   const [reporting, setReporting] = useState(false);
   const [reportText, setReportText] = useState('');
 
-  const tags: string[] = Array.isArray(script.tags) ? script.tags : (typeof script.tags === 'string' ? script.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+  const rawTags: any = script.tags;
+  const tags: string[] = Array.isArray(rawTags)
+    ? rawTags
+    : (typeof rawTags === 'string' ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : []);
 
   const handleDownload = async () => {
     try {

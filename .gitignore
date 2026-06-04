@@ -35,3 +35,6 @@ next-env.d.ts
 
 # data/data.json 保留在 repo (這是資料庫)
 
+
+.vercel
+.env*

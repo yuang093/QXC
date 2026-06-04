@@ -13,7 +13,7 @@ const emptyScript = {
   name: '',
   url: '',
   description: '',
-  tags: '',
+  tags: '' as string, // 編輯時用逗號分隔字串, 提交時轉陣列
   size_kb: null as number | null,
   version: '',
   status: 'active' as 'active' | 'deprecated',
@@ -29,7 +29,7 @@ export default function EditModal({ script, onClose, onSave }: EditModalProps) {
         name: script.name,
         url: script.url,
         description: script.description,
-        tags: script.tags,
+        tags: Array.isArray(script.tags) ? script.tags.join(', ') : (script.tags || ''),
         size_kb: script.size_kb,
         version: script.version || '',
         status: script.status as 'active' | 'deprecated',
@@ -46,19 +46,28 @@ export default function EditModal({ script, onClose, onSave }: EditModalProps) {
     }
     setSaving(true);
     try {
+      // 將 tags 字串轉陣列
+      const tagsArray = (form.tags as unknown as string)
+        .split(',')
+        .map(t => t.trim())
+        .filter(Boolean);
+
+      const payload = {
+        ...form,
+        tags: tagsArray,
+      };
+
       if (script) {
-        // 更新
         await fetch(`/api/scripts/${script.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       } else {
-        // 新增
         await fetch('/api/scripts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       }
       onSave();
