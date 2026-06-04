@@ -51,14 +51,16 @@ export default function Home() {
   }, [search]);
 
   // 載入資料
-  const loadScripts = async () => {
+  const loadScripts = async (resetPage = false) => {
     setLoading(true);
     try {
+      const targetPage = resetPage ? 1 : page;
+      if (resetPage) setPage(1);
       const params = new URLSearchParams({
         q: debouncedSearch,
         tag: activeTag,
         sort,
-        page: String(page),
+        page: String(targetPage),
         limit: String(PER_PAGE),
       });
       const res = await fetch(`/api/scripts?${params}`);
@@ -108,7 +110,7 @@ export default function Home() {
   const handleDelete = async (id: number) => {
     if (!confirm('確定刪除此腳本? (含所有留言)')) return;
     await fetch(`/api/scripts/${id}`, { method: 'DELETE' });
-    loadScripts();
+    loadScripts(true);
   };
 
   const handleEdit = (s: Script) => {
@@ -300,7 +302,7 @@ export default function Home() {
         <EditModal
           script={editing}
           onClose={() => setIsModalOpen(false)}
-          onSave={loadScripts}
+          onSave={() => loadScripts(true)}
         />
       )}
 
