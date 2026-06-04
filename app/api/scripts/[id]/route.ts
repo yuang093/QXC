@@ -1,60 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, withDb } from '@/lib/github-db';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/scripts/[id] - 取得單一腳本
+// GET /api/scripts/[id]
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = getDb();
-  const id = parseInt(params.id, 10);
-  const script = db.prepare('SELECT * FROM scripts WHERE id = ?').get(id) as any;
-  if (!script) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  try {
+    const db = await getDb();
+    const id = parseInt(params.id, 10);
+    const script = db.scripts.find(s => s.id === id);
+    if (!script) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    const comments = db.comments.filter(c => c.script_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return NextResponse.json({ script, comments });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
-  // 包含留言
-  const comments = db.prepare('SELECT * FROM comments WHERE script_id = ? ORDER BY created_at DESC').all(id);
-  return NextResponse.json({ script, comments });
 }
 
-// PUT /api/scripts/[id] - 更新腳本
+// PUT /api/scripts/[id]
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = getDb();
-  const id = parseInt(params.id, 10);
-  const body = await req.json();
-  const { name, url, description, tags, size_kb, version, status } = body;
+  try {
+    const id = parseInt(params.id, 10);
+    const body = await req.json();
+    const { name, url, description, tags, size_kb, version, status } = body;
 
-  const existing = db.prepare('SELECT * FROM scripts WHERE id = ?').get(id);
-  if (!existing) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
+    const result = await withDb<boolean>(async (db) => {
+      const idx = db.scripts.findIndex(s => s.id === id);
+      if (idx === -1) return { result: false, message: '' };
+      const cur = db.scripts[idx];
+
+      db.scripts[idx] = {
+        ...cur,
+        name: name ? String(name).slice(0, 200) : cur.name,
+        url: url ?? cur.url,
+        description: description !== undefined ? String(description).slice(0, 3000) : cur.description,
+        tags: Array.isArray(tags) ? tags :
+              (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : cur.tags),
+        size_kb: size_kb !== undefined ? (size_kb ? Number(size_kb) : null) : cur.size_kb,
+        version: version !== undefined ? (version ? String(version) : null) : cur.version,
+        status: status === 'deprecated' ? 'deprecated' : (status === 'active' ? 'active' : cur.status),
+        updated_at: new Date().toISOString(),
+      };
+      return { result: true, message: `chore: update script #${id}` };
+    });
+
+    if (!result) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
-
-  db.prepare(`
-    UPDATE scripts SET
-      name = ?, url = ?, description = ?, tags = ?,
-      size_kb = ?, version = ?, status = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    (name ?? (existing as any).name).toString().slice(0, 200),
-    url ?? (existing as any).url,
-    (description ?? (existing as any).description).toString().slice(0, 3000),
-    (tags ?? (existing as any).tags).toString().slice(0, 200),
-    size_kb ?? (existing as any).size_kb,
-    version ?? (existing as any).version,
-    status ?? (existing as any).status,
-    id
-  );
-
-  return NextResponse.json({ ok: true });
 }
 
-// DELETE /api/scripts/[id] - 刪除腳本
+// DELETE /api/scripts/[id]
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = getDb();
-  const id = parseInt(params.id, 10);
-  const result = db.prepare('DELETE FROM scripts WHERE id = ?').run(id);
-  if (result.changes === 0) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  try {
+    const id = parseInt(params.id, 10);
+    const result = await withDb<boolean>(async (db) => {
+      const before = db.scripts.length;
+      db.scripts = db.scripts.filter(s => s.id !== id);
+      db.comments = db.comments.filter(c => c.script_id !== id);
+      db.reports = db.reports.filter(r => r.script_id !== id);
+      return { result: db.scripts.length < before, message: `chore: delete script #${id}` };
+    });
+
+    if (!result) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
 }

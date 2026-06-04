@@ -1,64 +1,97 @@
 # QXC.exe — Python Script Archive
 
 > 🏴‍☠️ A 90s Y2K-style archive for Python trading algorithms
+>
+> 100% Serverless. 0 元資料庫。GitHub JSON 永久儲存。
 
 ![QXC Screenshot](https://img.shields.io/badge/style-90s_Y2K-ff9eb5?style=for-the-badge)
 ![Next.js](https://img.shields.io/badge/Next.js-14-2a1f3d?style=for-the-badge&logo=next.js)
-![SQLite](https://img.shields.io/badge/SQLite-3-88c8e8?style=for-the-badge&logo=sqlite)
+![GitHub API](https://img.shields.io/badge/GitHub-JSON-88c8e8?style=for-the-badge&logo=github)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3-c89ec7?style=for-the-badge&logo=tailwindcss)
 
 ## ✨ Features
 
 - 📁 **Script Archive** — Python 腳本下載連結與說明
-- 📊 **Statistics** — 訪問量、下載次數、即時數據
-- 🔍 **Search & Filter** — 全文搜尋、標籤分類、排序 (新→舊、熱門、字母)
+- 📊 **Statistics** — 訪問量、下載次數
+- 🔍 **Search & Filter** — 全文搜尋、標籤分類、排序
 - 💬 **Comments** — 每個腳本可留言
 - ⚠️ **Broken Link Reports** — 使用者可回報失效連結
 - 🌙 **Dark Mode** — 復古色調完整切換
 - 📤 **CSV Export/Import** — 完整資料備份與還原
-- 🔐 **Admin Panel** — 密碼保護的管理後台 (`yuang093`)
-- 📄 **Pagination** — 分頁支援大量資料
+- 🔐 **Admin Panel** — 密碼保護的管理後台
+- 📄 **Pagination** — 分頁支援
 
-## 🎨 Design
+## 🏗️ 架構
 
-90 年代 Y2K 風格：
-- Mac OS 風格視窗、像素字體
-- VT323 / Press Start 2P / Silkscreen / DM Mono
-- 薄荷綠、桃粉、紫紅、米黃、淡藍
-- 復古按鈕、貼紙、CRT 掃描線
-- 完全避開 Inter/Roboto/Arial 與紫色漸層
-
-## 🚀 Quick Start
-
-```bash
-# 安裝
-npm install
-
-# 初始化資料庫 (會建立 data/qxc.db 並 seed 範例資料)
-npm run init-db
-
-# 開發
-npm run dev
-
-# 開啟 http://localhost:3000
+```
+使用者 → Vercel (Next.js) → GitHub Contents API → data/data.json
+                          ↑
+                    全部資料儲存在這裡
 ```
 
-## 📦 Deployment to Vercel
+**完全 Serverless**，無需任何資料庫。
 
-1. 推到 GitHub (已預設)
-2. 在 [Vercel](https://vercel.com) 匯入此 repo
-3. 設定環境變數 (選用):
-   - `ADMIN_PASSWORD` (預設 `yuang093`)
-4. Deploy!
+## 🚀 部署步驟
 
-⚠️ **重要**: Vercel 的 serverless 環境預設不支援持久化檔案系統。
-SQLite 在 Vercel 上**只會存活於單次請求** (因為 /tmp 在每次冷啟動會被清空)。
+### 1. 建立 GitHub Token
 
-**生產環境建議**：
-- 對於正式使用，請改用 [Vercel Postgres](https://vercel.com/storage/postgres) 或 [Turso](https://turso.tech/) (libSQL，SQLite 相容)
-- 改用 Postgres 的 `pg` 套件，schema 幾乎一樣
+1. 到 https://github.com/settings/tokens/new
+2. **Note** 填 `QXC Archive`
+3. **Expiration** 選 `No expiration` (或自訂)
+4. **Scopes** 勾選 ✅ `Contents` (讀寫)
+5. 按 **Generate token**，**複製 token** (只會顯示一次！)
 
-對於個人/小團隊使用，SQLite 在本地與大部分 VPS 都運作良好。
+### 2. 在 Vercel 設定環境變數
+
+到 Vercel Dashboard → 你的 QXC 專案 → Settings → Environment Variables：
+
+| Key | Value | 說明 |
+|-----|-------|------|
+| `GITHUB_TOKEN` | `ghp_xxxxxxxxxx` | 步驟 1 取得的 token |
+| `GITHUB_REPO` | `yuang093/QXC` | 預設值 |
+| `GITHUB_BRANCH` | `main` | 預設值 |
+| `GITHUB_PATH` | `data/data.json` | 預設值 |
+| `ADMIN_PASSWORD` | `yuang093` | 預設值 (建議改掉) |
+
+### 3. 第一次部署
+
+Vercel 會自動部署。**第一次訪問時，API 會自動在 `data/data.json` 建立空資料庫**。
+
+若要使用預設範例資料：
+1. 把 `data/data.json` 從本機 push 上去
+2. 或匯入 CSV
+
+### 4. 完成！
+
+到 `https://你的網址.vercel.app` 開始使用。
+
+## 💻 本地開發
+
+```bash
+# 1. Clone
+git clone https://github.com/yuang093/QXC.git
+cd QXC
+
+# 2. 安裝
+npm install
+
+# 3. 設定環境變數
+cp .env.example .env.local
+# 編輯 .env.local 填入 GITHUB_TOKEN
+
+# 4. 啟動
+npm run dev
+
+# 5. 開啟 http://localhost:3000
+```
+
+## 📋 限制與取捨
+
+- ✅ 永久免費（GitHub API 公開端點 60 req/hr 認證、5000 req/hr 認證）
+- ✅ 完整 git 歷史記錄
+- ⚠️ 寫入 ~500ms（有 30 秒 cache 減少 GET）
+- ⚠️ 併發寫入可能衝突（自動 retry）
+- ⚠️ Token 有讀寫權限，請妥善保管
 
 ## 🗂️ Project Structure
 
@@ -74,36 +107,25 @@ QXC/
 │   │   ├── csv/          # 匯出匯入
 │   │   └── admin/        # 認證
 │   ├── admin/            # 管理後台頁
-│   ├── globals.css       # 全域樣式
-│   ├── layout.tsx        # Root layout
-│   └── page.tsx          # 首頁
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
 ├── components/
-│   ├── ScriptCard.tsx    # 腳本卡片
-│   ├── EditModal.tsx     # 新增/編輯 modal
-│   └── ThemeToggle.tsx   # 深淺色切換
+│   ├── ScriptCard.tsx
+│   ├── EditModal.tsx
+│   └── ThemeToggle.tsx
 ├── lib/
-│   └── db.ts             # SQLite 連線與 schema
-├── scripts/
-│   └── init-db.js        # 初始化資料庫
-├── data/                 # SQLite 檔案 (gitignore)
+│   └── github-db.ts      # GitHub Contents API 封裝
+├── data/
+│   └── data.json         # 資料庫本體
 └── package.json
 ```
 
-## 🔐 Admin Access
+## 🔐 管理後台
 
-- 預設密碼: `yuang093`
+- 預設密碼：`yuang093` (請透過環境變數改掉)
 - 點擊右上角 `⚙ ADMIN` 輸入密碼
-- 管理員可：新增、編輯、刪除腳本、匯入/匯出 CSV、查看失效回報
-- 進入 `/admin` 查看失效連結回報
-
-## 📋 CSV Format
-
-```csv
-id,name,url,description,tags,downloads,size_kb,version,status,created_at,updated_at
-1,amV11.py,https://...,"SPX 早盤策略",SPX,MORNING,247,14.2,v11,active,2026-05-30,...
-```
-
-匯入時 `id` 會被忽略（自動編號），其他欄位都會寫入。
+- 管理員可：新增、編輯、刪除、匯入/匯出 CSV、查看失效回報
 
 ## 📜 License
 

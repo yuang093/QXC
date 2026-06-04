@@ -23,7 +23,7 @@ export default function Home() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPwd, setAdminPwd] = useState('');
   const [adminError, setAdminError] = useState('');
-  const [visits, setVisits] = useState({ total: 0, today: 0, last7: 0 });
+  const [visits, setVisits] = useState({ total: 0 });
 
   const PER_PAGE = 10;
 
@@ -182,9 +182,7 @@ export default function Home() {
             </div>
             <div className="flex flex-wrap justify-center gap-3">
               <StatBubble label="FILES" value={total} />
-              <StatBubble label="VISITS" value={visits.total} />
-              <StatBubble label="TODAY" value={visits.today} accent="pink" />
-              <StatBubble label="7-DAYS" value={visits.last7} accent="purple" />
+              <StatBubble label="VISITS" value={visits.total} accent="pink" />
             </div>
             <div className="flex flex-col gap-2">
               <button onClick={handleNew} className="btn-retro btn-primary-retro">

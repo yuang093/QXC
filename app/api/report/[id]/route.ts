@@ -1,40 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, withDb, checkAdmin } from '@/lib/github-db';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/report/[id] - 回報失效連結
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = getDb();
-  const id = parseInt(params.id, 10);
-  const { reason } = await req.json().catch(() => ({}));
+  try {
+    const id = parseInt(params.id, 10);
+    const { reason } = await req.json().catch(() => ({}));
+    const db = await getDb();
+    if (!db.scripts.find(s => s.id === id)) {
+      return NextResponse.json({ error: 'script not found' }, { status: 404 });
+    }
 
-  const exists = db.prepare('SELECT id FROM scripts WHERE id = ?').get(id);
-  if (!exists) {
-    return NextResponse.json({ error: 'script not found' }, { status: 404 });
+    const newId = await withDb<number>(async (d) => {
+      const nid = (d.reports.reduce((m, r) => Math.max(m, r.id), 0) || 0) + 1;
+      d.reports.push({
+        id: nid,
+        script_id: id,
+        reason: (reason || '').slice(0, 500),
+        created_at: new Date().toISOString(),
+      });
+      return { result: nid, message: `chore: add report on #${id}` };
+    });
+    return NextResponse.json({ id: newId, ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
-
-  const result = db.prepare('INSERT INTO reports (script_id, reason) VALUES (?, ?)').run(
-    id,
-    (reason || '').slice(0, 500)
-  );
-  return NextResponse.json({ id: result.lastInsertRowid, ok: true });
 }
 
-// GET /api/report - 取得所有失效回報 (管理員用)
 export async function GET(req: NextRequest) {
-  const db = getDb();
-  const { searchParams } = new URL(req.url);
-  const key = searchParams.get('key');
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yuang093';
-  if (key !== ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  try {
+    const { searchParams } = new URL(req.url);
+    const key = searchParams.get('key');
+    if (!checkAdmin(key)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    const db = await getDb();
+    const reports = [...db.reports]
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(r => ({
+        ...r,
+        script_name: db.scripts.find(s => s.id === r.script_id)?.name || null,
+      }));
+    return NextResponse.json({ reports });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
-  const reports = db.prepare(`
-    SELECT r.*, s.name as script_name
-    FROM reports r
-    LEFT JOIN scripts s ON s.id = r.script_id
-    ORDER BY r.created_at DESC
-  `).all();
-  return NextResponse.json({ reports });
 }

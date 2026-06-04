@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, Script } from '@/lib/db';
+import { getDb, withDb, checkAdmin, Script } from '@/lib/github-db';
 
 export const dynamic = 'force-dynamic';
 
-// 將資料庫轉成 CSV 格式
 function toCSV(scripts: Script[]): string {
   const headers = ['id', 'name', 'url', 'description', 'tags', 'downloads', 'size_kb', 'version', 'status', 'created_at', 'updated_at'];
   const escape = (val: any) => {
@@ -14,11 +13,13 @@ function toCSV(scripts: Script[]): string {
     }
     return str;
   };
-  const rows = scripts.map(s => headers.map(h => escape((s as any)[h])).join(','));
+  const rows = scripts.map(s => headers.map(h => {
+    if (h === 'tags') return escape((s.tags || []).join(','));
+    return escape((s as any)[h]);
+  }).join(','));
   return [headers.join(','), ...rows].join('\n');
 }
 
-// 解析 CSV
 function parseCSV(csv: string): Partial<Script>[] {
   const lines = csv.split(/\r?\n/).filter(l => l.trim());
   if (lines.length === 0) return [];
@@ -49,7 +50,9 @@ function parseCSV(csv: string): Partial<Script>[] {
     const row: any = {};
     headers.forEach((h, i) => {
       const v = values[i] ?? '';
-      if (['downloads', 'size_kb'].includes(h)) {
+      if (h === 'tags') {
+        row[h] = v ? v.split(',').map(t => t.trim()).filter(Boolean) : [];
+      } else if (['downloads', 'size_kb', 'id'].includes(h)) {
         row[h] = v ? parseFloat(v) : null;
       } else {
         row[h] = v;
@@ -59,64 +62,60 @@ function parseCSV(csv: string): Partial<Script>[] {
   });
 }
 
-// GET /api/csv - 匯出 CSV
+// GET 匯出
 export async function GET() {
-  const db = getDb();
-  const scripts = db.prepare('SELECT * FROM scripts ORDER BY id ASC').all() as Script[];
-  const csv = toCSV(scripts);
-
-  return new NextResponse(csv, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="qxc-archive-${new Date().toISOString().slice(0, 10)}.csv"`,
-    },
-  });
+  try {
+    const db = await getDb();
+    const csv = toCSV(db.scripts);
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="qxc-archive-${new Date().toISOString().slice(0, 10)}.csv"`,
+      },
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
 }
 
-// POST /api/csv - 匯入 CSV (管理員)
+// POST 匯入
 export async function POST(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const key = searchParams.get('key');
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'yuang093';
-  if (key !== ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-
-  const csv = await req.text();
-  const rows = parseCSV(csv);
-  const db = getDb();
-
-  // 策略: 完全清空後重建, 確保 CSV 是 single source of truth
-  // 保留 comments 與 visits
-  const insert = db.prepare(`
-    INSERT INTO scripts (name, url, description, tags, downloads, size_kb, version, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  let inserted = 0;
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM scripts').run();
-    for (const r of rows) {
-      if (!r.name || !r.url) continue;
-      insert.run(
-        String(r.name),
-        String(r.url),
-        String(r.description || ''),
-        String(r.tags || ''),
-        Number(r.downloads || 0),
-        r.size_kb ? Number(r.size_kb) : null,
-        r.version ? String(r.version) : null,
-        String(r.status || 'active')
-      );
-      inserted++;
-    }
-  });
-
   try {
-    tx();
-    return NextResponse.json({ ok: true, inserted, total: rows.length });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const { searchParams } = new URL(req.url);
+    if (!checkAdmin(searchParams.get('key'))) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    const csv = await req.text();
+    const rows = parseCSV(csv);
+
+    const result = await withDb<number>(async (db) => {
+      let inserted = 0;
+      // 完全取代 scripts, 保留 comments/reports/visits
+      db.scripts = [];
+      const now = new Date().toISOString();
+      for (const r of rows) {
+        if (!r.name || !r.url) continue;
+        db.scripts.push({
+          id: r.id || (inserted + 1),
+          name: String(r.name),
+          url: String(r.url),
+          description: String(r.description || ''),
+          tags: r.tags || [],
+          downloads: Number(r.downloads || 0),
+          size_kb: r.size_kb ? Number(r.size_kb) : null,
+          version: r.version ? String(r.version) : null,
+          status: (r.status === 'deprecated' ? 'deprecated' : 'active') as any,
+          created_at: r.created_at || now,
+          updated_at: r.updated_at || now,
+        });
+        inserted++;
+      }
+      return { result: inserted, message: `chore: CSV import ${inserted} scripts` };
+    });
+
+    return NextResponse.json({ ok: true, inserted: result, total: rows.length });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

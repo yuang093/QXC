@@ -26,16 +26,12 @@ yarn-error.log*
 .env*.local
 .env
 
-# SQLite database
-data/
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 # Vercel
 .vercel
+
+# data/data.json 保留在 repo (這是資料庫)
+
