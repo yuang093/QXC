@@ -98,9 +98,21 @@ export function getDb(): Database.Database {
       ['bcs_dynamic_1500V7.py', 'https://github.com/yuang093/QXC/raw/main/scripts/bcs_dynamic_1500V7.py',
        'SPX 動態備兌看漲策略，動態調整 strike 與倉位。',
        'SPX,BCS,DYNAMIC', 178, 22.1, 'v7', 'active'],
-      ['pmV5.py', 'https://github.com/yuang093/QXC/raw/main/scripts/pmV5.py',
-       'SPX 下午盤賣方策略，於下午開盤後執行動態 sell。',
-       'SPX,AFTERNOON,PM', 134, 16.5, 'v5', 'active'],
+      ['pmV6.py', 'https://github.com/yuang093/QXC/raw/main/scripts/pmV6.py',
+       `SPX 0DTE Iron Condor 下午盤機器人。
+
+在 SPY 溫和上漲趨勢下，於美東 15:00-15:30 間以 5 分鐘間隔（共 6 個時段）建立當日到期（0DTE）的 4 腿 Iron Condor 價差組合：Short Put（Δ≈-0.35）+ Long Put（−80 點）+ Short Call（ATM+10）+ Long Call（+80 點），透過時間衰減賺取權利金。
+
+履約價選擇：以 ATM 為中心 ±300 點搜尋候選，動態取最接近目標 Delta -0.35 的 Short Put；Delta 搜尋失敗則 fallback 至 near5(ATM) ± 80 固定寬度。
+
+趨勢濾網：僅在 SPY > SMA7 且漲幅 ≤ 2% 時進場，強趨勢時主動跳過。
+
+下單順序：採「先買保險、再賣主力」分腿下單 — 成交 Long 腿後才下 Short 腿，若 Short 失敗自動平倉已買的 Hedge 避免裸部位。
+
+停損管理：每筆 Short 成交價 × 1.8 倍登記為 STOP BUY 停損，並以 SAVED_STOPS 多層字典管理；啟動時自動掃描所有 SPXW 空單補上停損。
+
+風控：3 次 retry 機制（買加價 / 賣降價各 0.10）、HEDGE 與 SHORT 獨立滑價容忍、啟動時強制清倉 SPX 殘留部位。`,
+       'SPX,AFTERNOON,PM,0DTE,IRON-CONDOR', 134, 16.5, 'v6', 'active'],
       ['monitor_utils.py', 'https://github.com/yuang093/QXC/raw/main/scripts/monitor_utils.py',
        '倉位監控工具集合，支援 IB API 即時倉位查詢與異常告警。',
        'UTIL,MONITOR', 89, 8.3, 'v1', 'active'],

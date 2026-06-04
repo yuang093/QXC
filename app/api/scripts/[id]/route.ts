@@ -35,10 +35,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       updated_at = datetime('now')
     WHERE id = ?
   `).run(
-    name ?? (existing as any).name,
+    (name ?? (existing as any).name).toString().slice(0, 200),
     url ?? (existing as any).url,
-    description ?? (existing as any).description,
-    tags ?? (existing as any).tags,
+    (description ?? (existing as any).description).toString().slice(0, 1000),
+    (tags ?? (existing as any).tags).toString().slice(0, 200),
     size_kb ?? (existing as any).size_kb,
     version ?? (existing as any).version,
     status ?? (existing as any).status,

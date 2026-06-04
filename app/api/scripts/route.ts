@@ -88,16 +88,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'name 和 url 為必填' }, { status: 400 });
   }
 
+  // 字數限制 (與前端一致)
+  const MAX_DESC = 1000;
+  const MAX_TAGS = 200;
+  const MAX_NAME = 200;
+
+  const safeName = String(name).slice(0, MAX_NAME);
+  const safeDesc = String(description || '').slice(0, MAX_DESC);
+  const safeTags = String(tags || '').slice(0, MAX_TAGS);
+
   const stmt = db.prepare(`
     INSERT INTO scripts (name, url, description, tags, size_kb, version, status)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
-    name,
+    safeName,
     url,
-    description || '',
-    tags || '',
+    safeDesc,
+    safeTags,
     size_kb ?? null,
     version ?? null,
     status || 'active'

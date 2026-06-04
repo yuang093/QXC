@@ -90,10 +90,11 @@ export default function EditModal({ script, onClose, onSave }: EditModalProps) {
             <Field label="程式名稱 *" value={form.name} onChange={v => setForm({ ...form, name: v })} />
             <Field label="下載連結 (URL) *" value={form.url} onChange={v => setForm({ ...form, url: v })} />
             <Field
-              label="說明"
+              label="說明 (最多 1000 字)"
               value={form.description}
-              onChange={v => setForm({ ...form, description: v })}
+              onChange={v => setForm({ ...form, description: v.slice(0, 1000) })}
               textarea
+              maxLength={1000}
             />
             <Field
               label="標籤 (以逗號分隔)"
@@ -136,11 +137,14 @@ export default function EditModal({ script, onClose, onSave }: EditModalProps) {
 }
 
 function Field({
-  label, value, onChange, type = 'text', placeholder = '', textarea = false
-}: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; textarea?: boolean }) {
+  label, value, onChange, type = 'text', placeholder = '', textarea = false, maxLength
+}: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; textarea?: boolean; maxLength?: number }) {
   return (
     <div>
-      <label className="font-screen text-[10px] text-ink dark:text-cream block mb-1">{label}</label>
+      <label className="font-screen text-[10px] text-ink dark:text-cream block mb-1 flex justify-between">
+        <span>{label}</span>
+        {maxLength && <span className="text-ink/50">{value.length}/{maxLength}</span>}
+      </label>
       {textarea ? (
         <textarea
           value={value}
@@ -148,6 +152,7 @@ function Field({
           placeholder={placeholder}
           className="input-retro w-full text-lg"
           rows={3}
+          maxLength={maxLength}
         />
       ) : (
         <input
@@ -156,6 +161,7 @@ function Field({
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           className="input-retro w-full"
+          maxLength={maxLength}
         />
       )}
     </div>
