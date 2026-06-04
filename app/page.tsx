@@ -336,11 +336,12 @@ export default function Home() {
   );
 }
 
-function StatBubble({ label, value, accent }: { label: string; value: number; accent?: 'pink' | 'purple' }) {
+function StatBubble({ label, value, accent }: { label: string; value: number | undefined; accent?: 'pink' | 'purple' }) {
   const bg = accent === 'pink' ? '!bg-pink' : accent === 'purple' ? '!bg-purple' : '';
+  const display = typeof value === 'number' ? value.toLocaleString() : '—';
   return (
     <div className={`stat-bubble min-w-[100px] ${bg}`}>
-      <div className="font-vt text-3xl text-ink dark:text-cream leading-none">{value.toLocaleString()}</div>
+      <div className="font-vt text-3xl text-ink dark:text-cream leading-none">{display}</div>
       <div className="font-screen text-[9px] text-ink/80 dark:text-cream/80 uppercase tracking-wider mt-1">{label}</div>
     </div>
   );

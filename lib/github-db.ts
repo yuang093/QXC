@@ -90,21 +90,23 @@ async function githubGet(): Promise<GetResult> {
   const res = await fetch(url, { headers, cache: 'no-store' });
 
   if (res.status === 404) {
-    // 第一次使用, 自動建立
     if (GITHUB_TOKEN) {
       await createInitialFile();
       return githubGet();
     }
-    // 沒有 token 又沒檔案 → 回傳預設
     return { data: { ...DEFAULT_DB }, sha: '' };
   }
 
   if (!res.ok) {
-    throw new Error(`GitHub GET failed: ${res.status} ${res.statusText}`);
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`GitHub GET ${res.status}: ${errBody.slice(0, 200)}`);
   }
 
   const json = await res.json();
-  const content = Buffer.from(json.content, 'base64').toString('utf-8');
+  // 避免 Buffer 在 Edge runtime 不存在, 用 atob
+  const content = typeof atob === 'function'
+    ? atob(json.content.replace(/\n/g, ''))
+    : Buffer.from(json.content, 'base64').toString('utf-8');
   const data = JSON.parse(content) as Database;
 
   // 確保所有欄位存在
@@ -128,7 +130,9 @@ async function githubPut(data: Database, sha: string, message: string): Promise<
 
   const body = {
     message,
-    content: Buffer.from(JSON.stringify(data, null, 2), 'utf-8').toString('base64'),
+    content: typeof btoa === 'function'
+      ? btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))))
+      : Buffer.from(JSON.stringify(data, null, 2), 'utf-8').toString('base64'),
     sha: sha || undefined,
     branch: GITHUB_BRANCH,
   };
@@ -166,7 +170,9 @@ async function createInitialFile() {
 
   const body = {
     message: 'chore: initialize QXC database',
-    content: Buffer.from(JSON.stringify(DEFAULT_DB, null, 2), 'utf-8').toString('base64'),
+    content: typeof btoa === 'function'
+      ? btoa(unescape(encodeURIComponent(JSON.stringify(DEFAULT_DB, null, 2))))
+      : Buffer.from(JSON.stringify(DEFAULT_DB, null, 2), 'utf-8').toString('base64'),
     branch: GITHUB_BRANCH,
   };
 
