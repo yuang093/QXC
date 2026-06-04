@@ -90,11 +90,11 @@ export default function EditModal({ script, onClose, onSave }: EditModalProps) {
             <Field label="程式名稱 *" value={form.name} onChange={v => setForm({ ...form, name: v })} />
             <Field label="下載連結 (URL) *" value={form.url} onChange={v => setForm({ ...form, url: v })} />
             <Field
-              label="說明 (最多 1000 字)"
+              label="說明 (最多 3000 字)"
               value={form.description}
-              onChange={v => setForm({ ...form, description: v.slice(0, 1000) })}
+              onChange={v => setForm({ ...form, description: v.slice(0, 3000) })}
               textarea
-              maxLength={1000}
+              maxLength={3000}
             />
             <Field
               label="標籤 (以逗號分隔)"

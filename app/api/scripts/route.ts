@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 字數限制 (與前端一致)
-  const MAX_DESC = 1000;
+  const MAX_DESC = 3000;
   const MAX_TAGS = 200;
   const MAX_NAME = 200;
 
