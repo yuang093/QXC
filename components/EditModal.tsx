@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Script } from '@/lib/db';
+import { Script } from '@/lib/github-db';
 
 interface EditModalProps {
   script: Script | null;

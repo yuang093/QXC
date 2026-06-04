@@ -68,7 +68,7 @@ let cache: { data: Database; sha: string; ts: number } | null = null;
 const CACHE_TTL = 30_000;
 
 // 簡單 lock 防止併發寫入
-let writeLock: Promise<unknown> = Promise.resolve();
+let writeLock: Promise<any> = Promise.resolve();
 
 interface GetResult {
   data: Database;
@@ -192,23 +192,26 @@ export async function getDb(): Promise<Database> {
 
 export async function saveDb(data: Database, message: string): Promise<void> {
   // 序列化寫入避免併發衝突
-  writeLock = writeLock.then(async () => {
+  const next = writeLock.then(async () => {
     cache = null; // 強制重抓
     const { sha } = await githubGet();
     await githubPut(data, sha, message);
   });
-  return writeLock as Promise<void>;
+  writeLock = next;
+  return next as Promise<void>;
 }
 
 export async function withDb<T>(fn: (db: Database) => Promise<{ result: T; message: string; }>): Promise<T> {
   // 序列化的 read-modify-write
-  return (writeLock = writeLock.then(async () => {
+  const next = writeLock.then(async () => {
     const { data, sha } = await githubGet();
     const { result, message } = await fn(data);
     await githubPut(data, sha, message);
     cache = { data, sha: '', ts: 0 }; // 立即過期
     return result;
-  })) as Promise<T>;
+  });
+  writeLock = next;
+  return next as Promise<T>;
 }
 
 export function checkAdmin(key: string | null): boolean {

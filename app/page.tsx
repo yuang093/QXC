@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Script } from '@/lib/db';
+import { Script } from '@/lib/github-db';
 import ScriptCard from '@/components/ScriptCard';
 import EditModal from '@/components/EditModal';
 import ThemeToggle from '@/components/ThemeToggle';

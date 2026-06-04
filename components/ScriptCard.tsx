@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Script, Comment } from '@/lib/db';
+import { Script, Comment } from '@/lib/github-db';
 
 interface ScriptCardProps {
   script: Script;
@@ -21,7 +21,7 @@ export default function ScriptCard({ script, isAdmin, onEdit, onDelete, onRefres
   const [reporting, setReporting] = useState(false);
   const [reportText, setReportText] = useState('');
 
-  const tags = script.tags ? script.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const tags: string[] = Array.isArray(script.tags) ? script.tags : (typeof script.tags === 'string' ? script.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
 
   const handleDownload = async () => {
     try {
