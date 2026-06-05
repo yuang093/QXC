@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, withDb, checkAdmin } from '@/lib/github-db';
+import { getDb, withDb, checkAdmin } from '@/lib/firebase-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +7,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   try {
     const db = await getDb();
     const id = parseInt(params.id, 10);
-    const comments = db.comments.filter(c => c.script_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const comments = Object.values(db.comments)
+      .filter(c => c.script_id === id)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
     return NextResponse.json({ comments });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -22,20 +24,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: '內容不可空白' }, { status: 400 });
     }
     const db = await getDb();
-    if (!db.scripts.find(s => s.id === id)) {
+    if (!db.scripts[String(id)]) {
       return NextResponse.json({ error: 'script not found' }, { status: 404 });
     }
 
     const newId = await withDb<number>(async (d) => {
-      const nid = (d.comments.reduce((m, c) => Math.max(m, c.id), 0) || 0) + 1;
-      d.comments.push({
+      const nid = (Object.values(d.comments).reduce((m, c) => Math.max(m, c.id), 0) || 0) + 1;
+      d.comments[String(nid)] = {
         id: nid,
         script_id: id,
         author: (author?.trim() || 'Anonymous').slice(0, 50),
         content: content.trim().slice(0, 1000),
         created_at: new Date().toISOString(),
-      });
-      return { result: nid, message: `chore: add comment on #${id}` };
+      };
+      return { result: nid };
     });
     return NextResponse.json({ id: newId, ok: true });
   } catch (e: any) {
@@ -57,9 +59,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     const result = await withDb<boolean>(async (d) => {
-      const before = d.comments.length;
-      d.comments = d.comments.filter(c => !(c.id === commentId && c.script_id === scriptId));
-      return { result: d.comments.length < before, message: `chore: delete comment #${commentId}` };
+      const k = String(commentId);
+      if (!d.comments[k] || d.comments[k].script_id !== scriptId) return { result: false };
+      delete d.comments[k];
+      return { result: true };
     });
     if (!result) return NextResponse.json({ error: 'not found' }, { status: 404 });
     return NextResponse.json({ ok: true });

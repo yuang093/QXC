@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, withDb } from '@/lib/github-db';
+import { getDb, withDb, Script } from '@/lib/firebase-db';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/scripts - 取得所有腳本
 export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
@@ -15,7 +14,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = (page - 1) * limit;
 
-    let scripts = [...db.scripts];
+    let scripts = Object.values(db.scripts);
 
     if (q) {
       scripts = scripts.filter(s =>
@@ -43,9 +42,8 @@ export async function GET(req: NextRequest) {
     const total = scripts.length;
     const paged = scripts.slice(offset, offset + limit);
 
-    // 取得所有 tag
     const allTags = Array.from(
-      new Set(db.scripts.flatMap(s => s.tags).filter(Boolean))
+      new Set(scripts.flatMap(s => s.tags).filter(Boolean))
     ).sort();
 
     return NextResponse.json({
@@ -61,7 +59,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/scripts - 新增腳本
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -72,13 +69,12 @@ export async function POST(req: NextRequest) {
     }
 
     const MAX_DESC = 3000;
-    const MAX_TAGS = 200;
     const MAX_NAME = 200;
 
     const result = await withDb<number>(async (db) => {
-      const newId = (db.scripts.reduce((max, s) => Math.max(max, s.id), 0) || 0) + 1;
+      const newId = (Object.values(db.scripts).reduce((m, s) => Math.max(m, s.id), 0) || 0) + 1;
       const now = new Date().toISOString();
-      const newScript = {
+      const newScript: Script = {
         id: newId,
         name: String(name).slice(0, MAX_NAME),
         url: String(url),
@@ -88,12 +84,12 @@ export async function POST(req: NextRequest) {
         downloads: 0,
         size_kb: size_kb ? Number(size_kb) : null,
         version: version ? String(version) : null,
-        status: (status === 'deprecated' ? 'deprecated' : 'active') as 'active' | 'deprecated',
+        status: (status === 'deprecated' ? 'deprecated' : 'active'),
         created_at: now,
         updated_at: now,
       };
-      db.scripts.push(newScript);
-      return { result: newId, message: `chore: add script ${newScript.name}` };
+      db.scripts[String(newId)] = newScript;
+      return { result: newId };
     });
 
     return NextResponse.json({ id: result, ok: true });

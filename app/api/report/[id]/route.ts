@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, withDb, checkAdmin } from '@/lib/github-db';
+import { getDb, withDb, checkAdmin } from '@/lib/firebase-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,19 +8,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const id = parseInt(params.id, 10);
     const { reason } = await req.json().catch(() => ({}));
     const db = await getDb();
-    if (!db.scripts.find(s => s.id === id)) {
+    if (!db.scripts[String(id)]) {
       return NextResponse.json({ error: 'script not found' }, { status: 404 });
     }
 
     const newId = await withDb<number>(async (d) => {
-      const nid = (d.reports.reduce((m, r) => Math.max(m, r.id), 0) || 0) + 1;
-      d.reports.push({
+      const nid = (Object.values(d.reports).reduce((m, r) => Math.max(m, r.id), 0) || 0) + 1;
+      d.reports[String(nid)] = {
         id: nid,
         script_id: id,
         reason: (reason || '').slice(0, 500),
         created_at: new Date().toISOString(),
-      });
-      return { result: nid, message: `chore: add report on #${id}` };
+      };
+      return { result: nid };
     });
     return NextResponse.json({ id: newId, ok: true });
   } catch (e: any) {
@@ -36,11 +36,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     const db = await getDb();
-    const reports = [...db.reports]
+    const reports = Object.values(db.reports)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .map(r => ({
         ...r,
-        script_name: db.scripts.find(s => s.id === r.script_id)?.name || null,
+        script_name: db.scripts[String(r.script_id)]?.name || null,
       }));
     return NextResponse.json({ reports });
   } catch (e: any) {

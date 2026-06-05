@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, withDb, checkAdmin, Script } from '@/lib/github-db';
+import { getDb, withDb, checkAdmin, Script } from '@/lib/firebase-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,11 +62,10 @@ function parseCSV(csv: string): Partial<Script>[] {
   });
 }
 
-// GET 匯出
 export async function GET() {
   try {
     const db = await getDb();
-    const csv = toCSV(db.scripts);
+    const csv = toCSV(Object.values(db.scripts));
     return new NextResponse(csv, {
       status: 200,
       headers: {
@@ -79,7 +78,6 @@ export async function GET() {
   }
 }
 
-// POST 匯入
 export async function POST(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -91,13 +89,13 @@ export async function POST(req: NextRequest) {
 
     const result = await withDb<number>(async (db) => {
       let inserted = 0;
-      // 完全取代 scripts, 保留 comments/reports/visits
-      db.scripts = [];
+      db.scripts = {};
       const now = new Date().toISOString();
       for (const r of rows) {
         if (!r.name || !r.url) continue;
-        db.scripts.push({
-          id: r.id || (inserted + 1),
+        const id = r.id || (inserted + 1);
+        const s: Script = {
+          id,
           name: String(r.name),
           url: String(r.url),
           description: String(r.description || ''),
@@ -105,13 +103,14 @@ export async function POST(req: NextRequest) {
           downloads: Number(r.downloads || 0),
           size_kb: r.size_kb ? Number(r.size_kb) : null,
           version: r.version ? String(r.version) : null,
-          status: (r.status === 'deprecated' ? 'deprecated' : 'active') as any,
+          status: (r.status === 'deprecated' ? 'deprecated' : 'active'),
           created_at: r.created_at || now,
           updated_at: r.updated_at || now,
-        });
+        };
+        db.scripts[String(id)] = s;
         inserted++;
       }
-      return { result: inserted, message: `chore: CSV import ${inserted} scripts` };
+      return { result: inserted };
     });
 
     return NextResponse.json({ ok: true, inserted: result, total: rows.length });

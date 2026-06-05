@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Script, Comment } from '@/lib/github-db';
+import { Script, Comment } from '@/lib/firebase-db';
 
 interface ScriptCardProps {
   script: Script;

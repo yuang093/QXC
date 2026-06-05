@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAdmin } from '@/lib/github-db';
+import { checkAdmin } from '@/lib/firebase-db';
 
 export const dynamic = 'force-dynamic';
 

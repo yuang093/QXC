@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, withDb } from '@/lib/github-db';
+import { getDb, withDb } from '@/lib/firebase-db';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/scripts/[id]
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = await getDb();
     const id = parseInt(params.id, 10);
-    const script = db.scripts.find(s => s.id === id);
+    const script = db.scripts[String(id)];
     if (!script) return NextResponse.json({ error: 'not found' }, { status: 404 });
-    const comments = db.comments.filter(c => c.script_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const comments = Object.values(db.comments)
+      .filter(c => c.script_id === id)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
     return NextResponse.json({ script, comments });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
-// PUT /api/scripts/[id]
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const id = parseInt(params.id, 10);
@@ -25,11 +25,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const { name, url, description, tags, size_kb, version, status } = body;
 
     const result = await withDb<boolean>(async (db) => {
-      const idx = db.scripts.findIndex(s => s.id === id);
-      if (idx === -1) return { result: false, message: '' };
-      const cur = db.scripts[idx];
+      const key = String(id);
+      const cur = db.scripts[key];
+      if (!cur) return { result: false };
 
-      db.scripts[idx] = {
+      db.scripts[key] = {
         ...cur,
         name: name ? String(name).slice(0, 200) : cur.name,
         url: url ?? cur.url,
@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         status: status === 'deprecated' ? 'deprecated' : (status === 'active' ? 'active' : cur.status),
         updated_at: new Date().toISOString(),
       };
-      return { result: true, message: `chore: update script #${id}` };
+      return { result: true };
     });
 
     if (!result) return NextResponse.json({ error: 'not found' }, { status: 404 });
@@ -51,16 +51,21 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// DELETE /api/scripts/[id]
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const id = parseInt(params.id, 10);
     const result = await withDb<boolean>(async (db) => {
-      const before = db.scripts.length;
-      db.scripts = db.scripts.filter(s => s.id !== id);
-      db.comments = db.comments.filter(c => c.script_id !== id);
-      db.reports = db.reports.filter(r => r.script_id !== id);
-      return { result: db.scripts.length < before, message: `chore: delete script #${id}` };
+      const key = String(id);
+      if (!db.scripts[key]) return { result: false };
+      delete db.scripts[key];
+      // 同時刪除留言與回報
+      for (const c of Object.keys(db.comments)) {
+        if (db.comments[c].script_id === id) delete db.comments[c];
+      }
+      for (const r of Object.keys(db.reports)) {
+        if (db.reports[r].script_id === id) delete db.reports[r];
+      }
+      return { result: true };
     });
 
     if (!result) return NextResponse.json({ error: 'not found' }, { status: 404 });
