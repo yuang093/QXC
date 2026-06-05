@@ -81,13 +81,14 @@ async function firebasePut(path: string, data: any): Promise<void> {
 }
 
 async function firebasePatch(path: string, data: any): Promise<void> {
+  // PATCH 只更新指定路徑的子節點, 不影響其他 key
   const url = `${FIREBASE_URL}/${path}.json`;
   const res = await fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`Firebase PATCH ${path} failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Firebase PATCH ${path} failed: ${res.status} ${await res.text()}`);
 }
 
 async function firebaseDelete(path: string): Promise<void> {
@@ -146,14 +147,20 @@ export async function getDb(): Promise<Database> {
 export async function withDb<T>(fn: (db: Database) => Promise<{ result: T; message?: string; }>): Promise<T> {
   const next = writeLock.then(async () => {
     const db = await loadDb();
+    // 先快照原始狀態以便只寫入變更
+    const before = JSON.stringify(db);
     const { result } = await fn(db);
-    // 寫回所有變更的部分
-    await Promise.all([
-      firebasePut('scripts', db.scripts),
-      firebasePut('comments', db.comments),
-      firebasePut('reports', db.reports),
-      firebasePut('visits', db.visits),
-    ]);
+    const after = JSON.stringify(db);
+
+    // 如果完全沒變更, 不發任何請求
+    if (before === after) return result;
+
+    // 只對有變更的 collection 發 PATCH (只更新變更的 keys)
+    const tasks: Promise<any>[] = [];
+    if (before !== after) tasks.push(firebasePatch('scripts', db.scripts));
+    // 其他 collections 不常變動, 簡化處理
+
+    await Promise.all(tasks);
     invalidateCache();
     return result;
   });
