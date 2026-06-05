@@ -110,10 +110,24 @@ async function loadDb(): Promise<Database> {
     firebaseGet<{ total: number; lastReset: string | null }>('visits'),
   ]);
 
+  // 過濾 null 條目 (Firebase 中可能存在 null key)
+  const cleanScripts: Record<string, Script> = {};
+  for (const [k, v] of Object.entries(scripts || {})) {
+    if (v && typeof v === 'object' && v.id) cleanScripts[k] = v as Script;
+  }
+  const cleanComments: Record<string, Comment> = {};
+  for (const [k, v] of Object.entries(comments || {})) {
+    if (v && typeof v === 'object' && v.id) cleanComments[k] = v as Comment;
+  }
+  const cleanReports: Record<string, Report> = {};
+  for (const [k, v] of Object.entries(reports || {})) {
+    if (v && typeof v === 'object' && v.id) cleanReports[k] = v as Report;
+  }
+
   const data: Database = {
-    scripts: scripts || {},
-    comments: comments || {},
-    reports: reports || {},
+    scripts: cleanScripts,
+    comments: cleanComments,
+    reports: cleanReports,
     visits: visits || { total: 0, lastReset: null },
   };
 
