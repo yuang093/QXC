@@ -128,7 +128,7 @@ export default function ScriptCard({ script, isAdmin, onEdit, onDelete, onRefres
         </div>
       </div>
 
-      <p className="font-mono text-sm text-ink/80 dark:text-cream/80 leading-relaxed mb-3">
+      <p className="font-mono text-sm text-ink/80 dark:text-cream/80 leading-relaxed mb-3 whitespace-pre-wrap break-words">
         {script.description}
       </p>
 
