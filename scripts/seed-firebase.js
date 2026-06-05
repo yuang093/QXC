@@ -103,7 +103,20 @@ const seedData = {
 };
 
 async function main() {
-  console.log('Seeding Firebase Realtime Database at:', FIREBASE_URL);
+  console.log('Checking Firebase Realtime Database at:', FIREBASE_URL);
+
+  // 先檢查現有資料
+  const checkRes = await fetch(`${FIREBASE_URL}/scripts.json`);
+  const existing = await checkRes.json();
+
+  if (existing && Object.keys(existing).length > 0) {
+    console.log(`\n[SKIP] Database already has ${Object.keys(existing).length} scripts.`);
+    console.log('       Not overwriting. To force re-seed, delete scripts/ first.');
+    console.log('       To restore deleted data, use CSV import from admin panel.\n');
+    return;
+  }
+
+  console.log('Database is empty. Seeding...');
   for (const [key, value] of Object.entries(seedData)) {
     const url = `${FIREBASE_URL}/${key}.json`;
     const res = await fetch(url, {
